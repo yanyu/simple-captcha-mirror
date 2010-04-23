@@ -33,18 +33,46 @@ module SimpleCaptcha #:nodoc
         instance_variable_set(:@captcha_invalid_message, options[:message] || "Secret Code did not match with the Image")
         module_eval do
           include SimpleCaptcha::ConfigTasks
-          attr_accessor :captcha, :captcha_key, :authenticate_with_captcha
+          attr_accessor :captcha, :captcha_key
           alias_method :valid_without_captcha?, :valid?
           alias_method :save_without_captcha, :save
+          cattr_accessor :authenticate_with_captcha
+          self.authenticate_with_captcha = false
           include SimpleCaptcha::ModelHelpers::InstanceMethods
         end
       end
+
+      # Ensure captcha check is required
+      # Enable to work with nested model.
+      # CommentBody.with_captcha do
+      #   @comment.save
+      # end
+      def with_captcha
+        save_val = self.authenticate_with_captcha
+        retval = nil
+        begin
+          self.authenticate_with_captcha = true
+          retval = yield if block_given?
+        ensure
+          self.authenticate_with_captcha = save_val
+        end
+        return retval
+      end
+
+      def captcha_off
+        self.authenticate_with_captcha = false
+      end
+
+      def captcha_on
+        self.authenticate_with_captcha = true
+      end
+
     end
     
     module InstanceMethods
       def valid?
         return valid_without_captcha? if RAILS_ENV == 'test'
-        if authenticate_with_captcha
+        if self.class.authenticate_with_captcha
           ret = valid_without_captcha?
           if captcha && captcha.upcase.delete(" ") == simple_captcha_value(captcha_key)
             ret = ret && true
@@ -54,7 +82,6 @@ module SimpleCaptcha #:nodoc
             self.errors.add_to_base(self.class.instance_variable_get(:@captcha_invalid_message)) :
             self.errors.add(:captcha, self.class.instance_variable_get(:@captcha_invalid_message))
           end
-          simple_captcha_passed!(captcha_key) if ret
           return ret
         else
           return valid_without_captcha?
@@ -63,23 +90,38 @@ module SimpleCaptcha #:nodoc
       
       def valid_with_captcha?
         return valid_without_captcha? if RAILS_ENV == 'test'
-        self.authenticate_with_captcha = true
+        self.class.authenticate_with_captcha = true
         ret = self.valid?
-        self.authenticate_with_captcha = false
+        simple_captcha_passed!(captcha_key) if ret
+        self.class.authenticate_with_captcha = false
         ret
       end
     
       def save_with_captcha
-        self.authenticate_with_captcha = true
+        self.class.authenticate_with_captcha = true
         ret = self.save_without_captcha
-        self.authenticate_with_captcha = false
+        simple_captcha_passed!(captcha_key) if ret
+        self.class.authenticate_with_captcha = false
         ret
       end
       
       def save(check_validations=true)
-        self.authenticate_with_captcha = false
-        self.save_without_captcha(check_validations)
+        if self.class.authenticate_with_captcha
+          self.save_with_captcha
+        else
+          self.save_without_captcha(check_validations)
+        end
       end
+
+      # Ensure captcha check is required
+      # record.with_captcha do
+      #   # Same as call record.save_with_captcha
+      #   record.save
+      # end
+      def with_captcha
+        self.class.with_captcha
+      end
+
     end
   end
 end

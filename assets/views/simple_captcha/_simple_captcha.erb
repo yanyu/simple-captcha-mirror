@@ -31,7 +31,11 @@
   </div>
   
   <div class='simple_captcha_field'>
-    <%= @simple_captcha_options[:field] %>
+    <% if @simple_captcha_options[:field].blank? %>
+      <%= @simple_captcha_options[:field_for] %>
+    <% else %>
+      <%= @simple_captcha_options[:field] %>
+    <% end %>
   </div>
   
   <div class='simple_captcha_label'>

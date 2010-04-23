@@ -77,6 +77,15 @@ module SimpleCaptcha #:nodoc
       render :partial => 'simple_captcha/simple_captcha'
     end
 
+    def show_simple_captcha_for(options={})
+      options[:field_value] ||= set_simple_captcha_data(options[:code_type])
+      @simple_captcha_options = 
+        {:image => simple_captcha_image(options),
+         :label => options[:label] || "(type the code from the image)",
+         :field_for => simple_captcha_field_for(options)}
+      render :partial => 'simple_captcha/simple_captcha'
+    end
+
     private
 
     def simple_captcha_image(options={})
@@ -95,6 +104,13 @@ module SimpleCaptcha #:nodoc
       text_field(options[:object], :captcha, :value => '') +
       hidden_field(options[:object], :captcha_key, {:value => options[:field_value]}) :
       text_field_tag(:captcha)
+    end
+
+    def simple_captcha_field_for(options={})
+      options[:object] ?
+      options[:object].text_field(:captcha, :value => '') +
+      options[:object].hidden_field(:captcha_key, {:value => options[:field_value]}) :
+      options[:object].text_field_tag(:captcha)
     end
 
     def set_simple_captcha_data(code_type)
